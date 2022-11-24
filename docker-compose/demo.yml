@@ -1,0 +1,5 @@
+version: "3.7"
+services:
+    web:
+      environment:
+        KEEP_RUN_DEMO_CHANNEL: lt --port 80

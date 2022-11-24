@@ -1,0 +1,53 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+sub off {
+    system qw( mvu docker --enable port80 );
+    system qw( mvu docker --disable demo );
+    system qw( mvu docker -p demo up --remove-orphans -d web );
+    exit;
+}
+
+sub on {
+    my $last_captured = '';
+
+    system qw( mvu docker --disable port80 );
+    system qw( mvu docker --enable demo );
+    system qw( mvu docker -p demo up --remove-orphans -d web );
+
+    $SIG{TERM} = \&off;
+    $SIG{INT}  = \&off;
+
+    while (1) {
+        my @logs = grep { /\.loca\.lt$/ } split /\n/, qx{mvu docker -p demo logs -t};
+
+        if (@logs) {
+            my $addr = pop @logs;
+            if ( $addr ne $last_captured ) {
+                $last_captured = $addr;
+                print "$addr\n";
+            }
+        }
+
+        sleep 10;
+    }
+}
+
+sub main {
+    my ($cmd) = @_;
+
+    $cmd //= 'on';
+    if ( $cmd eq 'on' ) {
+        on;
+    }
+    elsif ( $cmd eq 'off' ) {
+        off;
+    }
+    else {
+        die "demo only supports on or off switch";
+    }
+}
+
+main @ARGV;

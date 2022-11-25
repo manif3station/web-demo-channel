@@ -3,25 +3,46 @@
 use strict;
 use warnings;
 
+my $port80 = -f ".enabled/port80.yml" ? 1 : 0;
+my $demo   = -f ".enabled/demo.yml"   ? 1 : 0;
+
+sub docker {
+    system qw(mvu docker -p demo), @_;
+}
+
+sub docker2 {
+    system qw(mvu docker ), @_;
+}
+
+sub disable {
+    docker2 qw( --enable port80 ) if $port80;
+    docker2 qw( --disable demo );
+}
+
 sub off {
-    system qw( mvu docker --enable port80 );
-    system qw( mvu docker --disable demo );
-    system qw( mvu docker -p demo up --remove-orphans -d web );
+    disable;
+
+    docker qw( down );
+
     exit;
 }
 
 sub on {
+    my @args          = @_;
     my $last_captured = '';
 
-    system qw( mvu docker --disable port80 );
-    system qw( mvu docker --enable demo );
-    system qw( mvu docker -p demo up --remove-orphans -d web );
+    docker2 qw( --disable port80 ) if $port80;
+    docker2 qw( --enable demo )    if !$demo;
+    docker qw( up --remove-orphans -d ), @args;
+
+    disable;
 
     $SIG{TERM} = \&off;
     $SIG{INT}  = \&off;
 
     while (1) {
-        my @logs = grep { /\.loca\.lt$/ } split /\n/, qx{mvu docker -p demo logs -t};
+        my @logs = grep { /\.loca\.lt$/ } split /\n/,
+          qx{ mvu docker -p demo logs -t };
 
         if (@logs) {
             my $addr = pop @logs;
@@ -36,11 +57,11 @@ sub on {
 }
 
 sub main {
-    my ($cmd) = @_;
+    my ( $cmd, @docker_args ) = @_;
 
     $cmd //= 'on';
     if ( $cmd eq 'on' ) {
-        on;
+        on @docker_args;
     }
     elsif ( $cmd eq 'off' ) {
         off;
